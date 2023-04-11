@@ -11,7 +11,7 @@ import (
 )
 
 type ystlHeader struct {
-	Meta  YbnHeader
+	Meta  GenericHeader
 	Count uint32
 }
 

@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-type YbnHeader struct {
+type GenericHeader struct {
 	Magic   [4]byte
 	Version uint32
 }

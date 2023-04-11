@@ -14,7 +14,7 @@ import (
 )
 
 type yscmHeader struct {
-	Meta    YbnHeader
+	Meta    GenericHeader
 	Count   uint32
 	Padding uint32 //zero
 }

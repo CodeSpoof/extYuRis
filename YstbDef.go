@@ -44,7 +44,7 @@ type ystbInfo struct {
 }
 
 type ystbHeader struct {
-	Meta         YbnHeader
+	Meta         GenericHeader
 	InstCnt      uint32
 	CodeSize     uint32
 	ArgSize      uint32

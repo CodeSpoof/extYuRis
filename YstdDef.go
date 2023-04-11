@@ -9,7 +9,7 @@ import (
 )
 
 type ystdHeader struct {
-	Meta      YbnHeader
+	Meta      GenericHeader
 	VarCount  uint32
 	TextCount uint32
 }

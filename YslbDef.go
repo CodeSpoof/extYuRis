@@ -11,7 +11,7 @@ import (
 )
 
 type yslbHeader struct {
-	Meta                   YbnHeader
+	Meta                   GenericHeader
 	Count                  uint32
 	labelRangeStartIndexes [256]uint32 // labelRangeStartIndexes[N] = index of first label with ID >= (N << 24)
 }

@@ -10,7 +10,7 @@ import (
 )
 
 type ysvrHeader struct {
-	Meta  YbnHeader
+	Meta  GenericHeader
 	Count uint16
 }
 

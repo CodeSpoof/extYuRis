@@ -13,7 +13,7 @@ import (
 )
 
 type yscfHeader struct {
-	Meta           YbnHeader
+	Meta           GenericHeader
 	Padding1       uint32
 	Compile        uint32
 	ScreenWidth    uint32
