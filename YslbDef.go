@@ -11,14 +11,14 @@ import (
 )
 
 type yslbHeader struct {
-	Meta                   GenericHeader
-	Count                  uint32
-	labelRangeStartIndexes [256]uint32 // labelRangeStartIndexes[N] = index of first label with ID >= (N << 24)
+	Meta  GenericHeader
+	Count uint32
 }
 
 type yslbInfo struct {
-	Header yslbHeader
-	Labels []yslbLabel
+	Header                 yslbHeader
+	labelRangeStartIndexes [256]uint32 // labelRangeStartIndexes[N] = index of first label with ID >= (N << 24)
+	Labels                 []yslbLabel
 }
 
 type yslbLabel struct {
@@ -68,6 +68,7 @@ func parseYslb(oriStm []byte, codePage int) (script yslbInfo, err error) {
 		err = fmt.Errorf("not a ybn file")
 		return
 	}
+	binary.Read(stm, binary.LittleEndian, &script.labelRangeStartIndexes)
 	script.Labels = make([]yslbLabel, script.Header.Count)
 	for i := 0; i < int(script.Header.Count); i++ {
 		label := &script.Labels[i]
