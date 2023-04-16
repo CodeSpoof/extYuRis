@@ -291,10 +291,10 @@ func extTxtFromYbn(script *ystbInfo, ops *[256]string, codePage int) (txt []stri
 	for _, inst := range script.Insts {
 		if ops[inst.Op] == "msg" {
 			if len(inst.Args) != 1 {
-				err = fmt.Errorf("the message op:0x%x has not only 1 argument", inst.Op)
+				err = fmt.Errorf("the message op:0x%X has not only 1 argument", inst.Op)
 				return
 			}
-			rawStr := []byte{}
+			var rawStr []byte
 			if inst.Args[0].Type == 3 {
 				// for English games, it seems the msg op uses type-3 resource
 				rawStr = inst.Args[0].Res.Res
@@ -305,7 +305,7 @@ func extTxtFromYbn(script *ystbInfo, ops *[256]string, codePage int) (txt []stri
 			txt = append(txt, codec.Decode(rawStr, codePage))
 		} else if ops[inst.Op] == "call" {
 			if len(inst.Args) < 1 {
-				err = fmt.Errorf("call op:0x%x argument less than 1", inst.Op)
+				err = fmt.Errorf("call op:0x%X argument less than 1", inst.Op)
 				return
 			}
 			if isFunctionToExtract(inst.Args[0].Res.Res) {
@@ -342,7 +342,7 @@ func parseYstbFile(oriStm []byte, outJsonName, outTxtName, outDecryptName, outIn
 	}
 	logln("guessing opcode if not provided...")
 	if !guessYstbOp(&script, ops) {
-		fmt.Printf("Guess opcodes failed, msg op:0x%x, call op:0x%x\n", IndexOf(ops[:], "msg"), IndexOf(ops[:], "call"))
+		fmt.Printf("Guess opcodes failed, msg op:0x%X, call op:0x%X\n", IndexOf(ops[:], "msg"), IndexOf(ops[:], "call"))
 	}
 	if outJsonName != "" {
 		logln("writing json...")

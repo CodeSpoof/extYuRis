@@ -7,7 +7,6 @@ import (
 	"github.com/regomne/eutil/codec"
 	"io"
 	"os"
-	"strings"
 )
 
 type GenericHeader struct {
@@ -37,18 +36,6 @@ func readFileToString(fileName string, codePage int) (s string, err error) {
 		return
 	}
 	s = codec.Decode(fileBytes, codePage)
-	return
-}
-
-func readFileToLines(fileName string, codePage int) (s []string, err error) {
-	txt, readErr := readFileToString(fileName, codePage)
-	if readErr != nil {
-		return nil, readErr
-	}
-	s = strings.Split(txt, "\n")
-	for i := range s {
-		s[i] = strings.Trim(s[i], "\r\n")
-	}
 	return
 }
 

@@ -22,6 +22,7 @@ type yslbInfo struct {
 }
 
 type yslbLabel struct {
+	EncodedName  []byte
 	Name         string
 	Id           uint32
 	CommandIndex uint32
@@ -74,9 +75,9 @@ func parseYslb(oriStm []byte, codePage int) (script yslbInfo, err error) {
 		label := &script.Labels[i]
 		var nameLength uint8
 		binary.Read(stm, binary.LittleEndian, &nameLength)
-		encodedName := make([]byte, nameLength)
-		stm.Read(encodedName)
-		label.Name = codec.Decode(encodedName, codePage)
+		label.EncodedName = make([]byte, nameLength)
+		stm.Read(label.EncodedName)
+		label.Name = codec.Decode(label.EncodedName, codePage)
 		binary.Read(stm, binary.LittleEndian, &label.Id)
 		binary.Read(stm, binary.LittleEndian, &label.CommandIndex)
 		binary.Read(stm, binary.LittleEndian, &label.ScriptId)
