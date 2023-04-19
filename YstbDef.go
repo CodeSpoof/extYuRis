@@ -499,7 +499,7 @@ func parseYstb(oriStm []byte, key []byte, decryptName string) (script ystbInfo, 
 	}
 	var decryptedStm io.ReadSeeker
 	if bytes.Compare(key, []byte("\x00\x00\x00\x00")) != 0 {
-		logf("decrypting, key is:%02x %02x %02x %02x\n", key[0], key[1], key[2], key[3])
+		logf("decrypting, key is:0x%02X%02X%02X%02X\n", key[3], key[2], key[1], key[0])
 		decryptYstb(oriStm, key, header)
 		decryptedStm = bytes.NewReader(oriStm)
 	} else {

@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/regomne/eutil/codec"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -51,8 +52,6 @@ func decryptBlock(stm []byte, key []byte) {
 	for i := 0; i < len(stm); i++ {
 		stm[i] ^= key[i&3]
 	}
-	b := stm[0]
-	stm[0] = b
 }
 
 func printUsage(exeName string) {
@@ -85,8 +84,9 @@ About the extraction to different formats:
   
 
 About the key:
-  Since the used XOR cipher is easy to break once you have some content like a
-  string. Most games use the default key, but if not, you may try:
+  The files use a 4-byte key XOR-Cipher. The Program can try to break it based
+  on assumptions about the content. This should work with any standard
+  compiled scripts. If it fails, try to use the default key or use these:
   0x6cfddadb or 0x30731B78. The Program may CRASH or PANIC if not given the
   correct key. If nothing works, try https://wiremask.eu/tools/xor-cracker/
 
@@ -136,7 +136,7 @@ func parseCp(s string) int {
 	}
 }
 
-func extractYbnFile(ybnName, outJsonName, outTxtName, outInstructName, outDecryptName string, key []byte, ops *[256]string, codePage int) bool {
+func extractYbnFile(ybnName, outJsonName, outTxtName, outInstructName, outDecryptName string, key []byte, guessKey bool, ops *[256]string, codePage int) bool {
 	logln("reading file:", ybnName)
 	oriStm, err := os.ReadFile(ybnName)
 	if err != nil {
@@ -148,6 +148,19 @@ func extractYbnFile(ybnName, outJsonName, outTxtName, outInstructName, outDecryp
 	binary.Read(stm, binary.LittleEndian, &magic)
 	switch strings.ToUpper(string(magic[:])) {
 	case "YSTB":
+		var header ystbHeader
+		stm.Seek(0, io.SeekStart)
+		binary.Read(stm, binary.LittleEndian, &header)
+		if guessKey {
+			guessedKey := [4]byte{}
+			id := binary.Size(header) + int(header.CodeSize) - 4
+			guessedKey[0] = oriStm[id]
+			guessedKey[1] = oriStm[id+1]
+			guessedKey[2] = oriStm[id+2]
+			guessedKey[3] = oriStm[id+3]
+			decryptBlock(guessedKey[:], []byte{12, 0, 0, 0})
+			return parseYstbFile(oriStm, outJsonName, outTxtName, outDecryptName, outInstructName, guessedKey[:], ops, codePage)
+		}
 		return parseYstbFile(oriStm, outJsonName, outTxtName, outDecryptName, outInstructName, key, ops, codePage)
 	case "YSLB":
 		return parseYslbFile(oriStm, outJsonName, outInstructName, codePage)
@@ -206,6 +219,7 @@ func main() {
 	outDecryptName := flag.String("decrypt", "", "output decrypted file name")
 	outYbnName := flag.String("new-ybn", "", "output ybn file name")
 	keyInt := flag.Int64("key", 0x96ac6fd3, "decode key")
+	guessKey := flag.Bool("guess-key", false, "try to guess the encryption key")
 	codePage := flag.String("cp", "932", "specify code page")
 	outputOpCode := flag.Bool("output-opcode", false, "output the opcode guessed")
 	inOpCodes := flag.String("ops", "", "specify op-code names like 90:msg,29:call")
@@ -234,7 +248,7 @@ func main() {
 		return
 	}
 	if *isExtract {
-		extractYbnFile(*inInputBinaryName, *outJsonName, *outTxtName, *outInstructName, *outDecryptName, key[:], &opCodes, parseCp(*codePage))
+		extractYbnFile(*inInputBinaryName, *outJsonName, *outTxtName, *outInstructName, *outDecryptName, key[:], *guessKey, &opCodes, parseCp(*codePage))
 	} else if *isPack {
 		packYbnFile(*inInputBinaryName, *outTxtName, *outInstructName, *outYbnName, key[:], &opCodes, parseCp(*codePage))
 	} else {

@@ -10,6 +10,7 @@ Made with code from regomne's extYbn in [chinesize](https://github.com/regomne/c
 - Extraction of raw data to json
 - Export of decrypted binary files
 - Guessing of `msg` and `call` Op-Code
+- Guessing of encryption key
 - Repacking of strings and project configuration
 
 ## Usage
@@ -23,6 +24,5 @@ See help text when executing the program
 - `go build .`
 
 ## Plans
-- Guessing of more Op-Codes
-- Automatic Key-Cracking
+- Guessing of more Op-Codes (especially END)
 - Extraction of YPF archives
