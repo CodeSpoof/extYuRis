@@ -10,12 +10,14 @@ import (
 	"hash/adler32"
 	"hash/crc32"
 	"io"
+	"os"
+	"path/filepath"
 	"sort"
 )
 
 type ypfHeader struct {
 	Meta                    GenericHeader
-	Num                     uint32
+	FileCount               uint32
 	ArchivedFilesHeaderSize uint32
 	Unk                     [16]byte // zero?
 }
@@ -62,10 +64,10 @@ func parseYpf(oriStm []byte, codePage int) (archive ypfInfo, err error) {
 		err = fmt.Errorf("not a ypf file")
 		return
 	}
-	archive.ArchivedFiles = make([]ypfEntry, archive.Header.Num)
+	archive.ArchivedFiles = make([]ypfEntry, archive.Header.FileCount)
 	lengthSwappingTable := getLengthSwappingTable(archive.Header.Meta.Version)
 	fileNameEncryptionKey := getFileNameEncryptionKey(archive.Header.Meta.Version)
-	for i := 0; i < int(archive.Header.Num); i++ {
+	for i := 0; i < int(archive.Header.FileCount); i++ {
 		entry := &archive.ArchivedFiles[i]
 		binary.Read(stm, binary.LittleEndian, &entry.NameChecksum)
 		var b byte
@@ -176,4 +178,195 @@ func extractFileFromYpf(oriStm []byte, entry ypfEntry) (fileBytes []byte, err er
 	}
 	r.Read(fileBytes)
 	return
+}
+
+func IndexOfByte(arr []byte, candidate byte) byte {
+	for index, c := range arr {
+		if c == candidate {
+			return byte(index)
+		}
+	}
+	return 0
+}
+
+func packYpf(outputYpf, inputDir string, version, codePage int) bool {
+	input, _ := filepath.Abs(inputDir)
+	offInput := len(input) + 1
+	var files []string
+	err := filepath.WalkDir(input, func(path string, info os.DirEntry, err error) error {
+		if err == nil && !info.IsDir() {
+			files = append(files, path[offInput:])
+		}
+		return nil
+	})
+	if err != nil {
+		fmt.Println("Error while listing files")
+		return false
+	}
+
+	var header ypfHeader
+	header.Meta.Version = uint32(version)
+	header.FileCount = uint32(len(files))
+	header.ArchivedFilesHeaderSize = 32
+	entries := make([]ypfEntry, len(files))
+
+	typeMap := map[string]uint8{
+		"txt": 0,
+		"bmp": 1,
+		"png": 2,
+		"jpg": 3,
+		"gif": 4,
+		"wav": 5,
+		"ogg": 6,
+		"psd": 7,
+		"ycg": 8, //masked as .png
+		"psb": 9,
+	}
+
+	i := 0
+	for _, file := range files {
+		entry := &entries[i]
+		entry.FileName = file
+		fileExt := filepath.Ext(file)
+		if fileExt == "ycg" {
+			entry.FileName = entry.FileName[:len(entry.FileName)-4]
+		}
+		if len(entry.FileName) == 0 {
+			fmt.Println("Filename can't be empty")
+			return false
+		}
+		for j := 0; j < i; j++ {
+			if entries[j].FileName == entry.FileName {
+				fmt.Println("Filenames can't be duplicates")
+				return false
+			}
+		}
+		encodedName := []byte(entry.FileName)
+		entry.NameChecksum = checksumByVersion(encodedName, uint32(version), true)
+		r, ok := typeMap[fileExt]
+		if !ok {
+			r = 0
+		}
+		entry.Type = r
+		header.ArchivedFilesHeaderSize += uint32(23 + len(encodedName))
+		if header.Meta.Version >= 479 {
+			header.ArchivedFilesHeaderSize += 4
+		}
+		i++
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].NameChecksum < entries[j].NameChecksum
+	})
+	var outBuff bytes.Buffer
+
+	for _, entry := range entries {
+		fmt.Printf("Adding %s\n", entry.FileName)
+		filePath := filepath.Join(inputDir, entry.FileName)
+		if entry.Type == typeMap["ycg"] {
+			filePath += ".ycg"
+		}
+		fileBytes, err := os.ReadFile(filePath)
+		if err != nil {
+			fmt.Println("Error while reading file")
+			return false
+		}
+		if len(fileBytes) > 0xFFFFFFFF {
+			fmt.Println("File too large")
+			return false
+		}
+		if len(fileBytes) == 0 {
+			fmt.Println("File empty")
+			return false
+		}
+		entry.Offset = uint64(uint32(len(outBuff.Bytes())) + header.ArchivedFilesHeaderSize)
+		entry.RawFileSize = uint32(len(fileBytes))
+
+		var compressed bytes.Buffer
+		w := zlib.NewWriter(&compressed)
+		w.Write(fileBytes)
+
+		if len(compressed.Bytes()) < len(fileBytes) {
+			entry.DataChecksum = checksumByVersion(compressed.Bytes(), uint32(version), false)
+			for _, e := range entries {
+				if e.DataChecksum == entry.DataChecksum && e.RawFileSize == entry.RawFileSize {
+					entry.Offset = e.Offset
+					break
+				} else {
+					outBuff.Write(compressed.Bytes())
+				}
+			}
+			entry.CompressedFileSize = uint32(len(compressed.Bytes()))
+			entry.IsCompressed = 1
+		} else {
+			entry.DataChecksum = checksumByVersion(fileBytes, uint32(version), false)
+			for _, e := range entries {
+				if e.DataChecksum == entry.DataChecksum && e.RawFileSize == entry.RawFileSize {
+					entry.Offset = e.Offset
+					break
+				} else {
+					outBuff.Write(fileBytes)
+				}
+			}
+			entry.CompressedFileSize = entry.RawFileSize
+			entry.IsCompressed = 0
+		}
+		if version < 479 && len(outBuff.Bytes()) > 0xFFFFFFFF {
+			fmt.Println("Output file too long")
+			return false
+		}
+
+	}
+	var fullBuff bytes.Buffer
+	binary.Write(&fullBuff, binary.LittleEndian, header)
+
+	for _, entry := range entries {
+		binary.Write(&fullBuff, binary.LittleEndian, entry.NameChecksum)
+		encodedName := codec.Encode(entry.FileName, codePage, codec.Replace)
+		if len(encodedName) > 0xFF {
+			fmt.Println("Filename can only be one byte")
+			return false
+		}
+		lengthEncoded := IndexOfByte(getLengthSwappingTable(uint32(version)), byte(len(encodedName)))
+		binary.Write(&fullBuff, binary.LittleEndian, lengthEncoded)
+		for i := range encodedName {
+			encodedName[i] = ^(encodedName[i] ^ getFileNameEncryptionKey(uint32(version)))
+		}
+		fullBuff.Write(encodedName)
+		binary.Write(&fullBuff, binary.LittleEndian, entry.Type)
+		binary.Write(&fullBuff, binary.LittleEndian, entry.IsCompressed)
+		binary.Write(&fullBuff, binary.LittleEndian, entry.RawFileSize)
+		binary.Write(&fullBuff, binary.LittleEndian, entry.CompressedFileSize)
+		if version < 479 {
+			binary.Write(&fullBuff, binary.LittleEndian, uint32(entry.Offset))
+		} else {
+			binary.Write(&fullBuff, binary.LittleEndian, entry.Offset)
+		}
+		binary.Write(&fullBuff, binary.LittleEndian, entry.DataChecksum)
+	}
+	if uint32(len(fullBuff.Bytes())) != header.ArchivedFilesHeaderSize {
+		fmt.Println("Oversized Header")
+		return false
+	}
+	outBuff.WriteTo(&fullBuff)
+	err = os.WriteFile(outputYpf, fullBuff.Bytes(), os.ModePerm)
+	if err != nil {
+		fmt.Println("Error while writing archive")
+		return false
+	}
+	return true
+}
+
+func extractYpf(oriStm []byte, outputDir string, codePage int) bool {
+	ypf, err := parseYpf(oriStm, codePage)
+	if err != nil {
+		return false
+	}
+	for _, file := range ypf.ArchivedFiles {
+		fileBytes, err := extractFileFromYpf(oriStm, file)
+		if err != nil {
+			return false
+		}
+		os.WriteFile(filepath.Join(outputDir, file.FileName), fileBytes, os.ModePerm)
+	}
+	return true
 }

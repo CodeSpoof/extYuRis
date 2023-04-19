@@ -24,5 +24,7 @@ See help text when executing the program
 - `go build .`
 
 ## Plans
+- Repacking of all formats from json and maybe from instruct
 - Guessing of more Op-Codes (especially END)
-- Extraction of YPF archives
+- Extraction/Repacking of YPF archives
+- (UI + edit directly inside YPF?)

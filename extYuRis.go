@@ -212,7 +212,7 @@ func main() {
 	defer os.Exit(retCode)
 	isExtract := flag.Bool("e", false, "extract a file")
 	isPack := flag.Bool("p", false, "pack a ybn")
-	inInputBinaryName := flag.String("input", "", "input ybn file name")
+	inInputName := flag.String("input", "", "input ybn file or directory name")
 	outJsonName := flag.String("json", "", "output json file name")
 	outInstructName := flag.String("instruct", "", "output instruct file name")
 	outTxtName := flag.String("txt", "", "output txt file name")
@@ -242,15 +242,15 @@ func main() {
 	gIsOutputOpcode = *outputOpCode
 	gVerbose = *verbose
 	if (*isExtract && *isPack) || (!*isExtract && !*isPack) ||
-		((*isPack || *isExtract) && *inInputBinaryName == "") ||
+		((*isPack || *isExtract) && *inInputName == "") ||
 		(*isPack && (*outYbnName == "" || (*outTxtName == "" && *outInstructName == ""))) {
 		printUsage(os.Args[0])
 		return
 	}
 	if *isExtract {
-		extractYbnFile(*inInputBinaryName, *outJsonName, *outTxtName, *outInstructName, *outDecryptName, key[:], *guessKey, &opCodes, parseCp(*codePage))
+		extractYbnFile(*inInputName, *outJsonName, *outTxtName, *outInstructName, *outDecryptName, key[:], *guessKey, &opCodes, parseCp(*codePage))
 	} else if *isPack {
-		packYbnFile(*inInputBinaryName, *outTxtName, *outInstructName, *outYbnName, key[:], &opCodes, parseCp(*codePage))
+		packYbnFile(*inInputName, *outTxtName, *outInstructName, *outYbnName, key[:], &opCodes, parseCp(*codePage))
 	} else {
 		printUsage(os.Args[0])
 		return
